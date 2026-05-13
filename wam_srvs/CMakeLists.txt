@@ -1,51 +1,32 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.8)
 project(wam_srvs)
 
-# Default to C99
-if(NOT CMAKE_C_STANDARD)
-  set(CMAKE_C_STANDARD 99)
-endif()
-
-# Default to C++14
-if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 14)
-endif()
-
-if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
-
-# find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(builtin_interfaces REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(trajectory_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
-set(srv_files
-  "srv/CartOrientationMove.srv"
-  "srv/JointMove.srv"
-  "srv/CartPositionMove.srv"
-  "srv/CartPoseMove.srv"
-  "srv/VelocityLimit.srv"
-)
-rosidl_generate_interfaces(${PROJECT_NAME} 
-  ${srv_files}
-  DEPENDENCIES builtin_interfaces std_msgs sensor_msgs geometry_msgs trajectory_msgs
-)
 
-if(BUILD_TESTING)
-  find_package(ament_cmake_gtest REQUIRED)
-  find_package(ament_lint_auto REQUIRED)
-  ament_lint_auto_find_test_dependencies()
-
-  include_directories(include)
- 
-endif()
+rosidl_generate_interfaces(${PROJECT_NAME}
+  srv/BHandFingerPos.srv
+  srv/BHandFingerVel.srv
+  srv/BHandGraspPos.srv
+  srv/BHandGraspVel.srv
+  srv/BHandSpreadPos.srv
+  srv/BHandSpreadVel.srv
+  srv/CartPosMove.srv
+  srv/GravityComp.srv
+  srv/Hold.srv
+  srv/JointMove.srv
+  srv/OrtnMove.srv
+  srv/PoseMove.srv
+  srv/LASERControl.srv
+  srv/LEDControl.srv
+  DEPENDENCIES
+  geometry_msgs
+  sensor_msgs
+  std_msgs
+)
 
 ament_export_dependencies(rosidl_default_runtime)
-ament_export_include_directories(include)
-
 ament_package()
-

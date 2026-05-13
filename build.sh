@@ -1,28 +1,11 @@
-#!/bin/bash
-source /opt/ros/dashing/setup.bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-cd wam_srvs
-colcon build
-source install/setup.bash
+# Humble's generators must run with the system ROS 2 Python, not Anaconda.
+export PATH="/opt/ros/humble/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH}"
 
-cd ../wam_msgs
-colcon build
-source install/setup.bash
-
-cd ../bhand_srvs
-colcon build
-source install/setup.bash
-
-cd ../bhand_msgs
-colcon build
-source install/setup.bash
-
-cd ../wam_node
-colcon build
-
-cd ../wam_demos
-colcon build
-
-cd ../wam_sim
-colcon build
-cd ..
+colcon --log-base log_ros2 build \
+  --symlink-install \
+  --build-base build_ros2 \
+  --install-base install_ros2 \
+  "$@"

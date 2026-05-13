@@ -1,46 +1,42 @@
 cmake_minimum_required(VERSION 3.8)
-project(wam_node)
+project(barrett_hand_node)
 
 find_package(ament_cmake REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
-find_package(tf2 REQUIRED)
 find_package(wam_msgs REQUIRED)
 find_package(wam_srvs REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system thread)
 find_package(Barrett QUIET)
 
 if(Barrett_FOUND)
-  add_executable(wam_node src/wam_node_ros2.cpp)
-  set_target_properties(wam_node PROPERTIES
+  add_executable(barrett_hand_node src/barrett_hand_node_ros2.cpp)
+  set_target_properties(barrett_hand_node PROPERTIES
     CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
   )
   set(LOCAL_LIBBARRETT_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/../libbarrett/include")
   if(EXISTS "${LOCAL_LIBBARRETT_INCLUDE}/barrett")
-    target_include_directories(wam_node BEFORE PRIVATE ${LOCAL_LIBBARRETT_INCLUDE})
+    target_include_directories(barrett_hand_node BEFORE PRIVATE ${LOCAL_LIBBARRETT_INCLUDE})
   endif()
-  target_include_directories(wam_node PRIVATE
+  target_include_directories(barrett_hand_node PRIVATE
     ${BARRETT_INCLUDE_DIRS}
     ${Boost_INCLUDE_DIRS}
   )
-  ament_target_dependencies(wam_node
+  ament_target_dependencies(barrett_hand_node
     geometry_msgs
     rclcpp
     sensor_msgs
-    std_msgs
     std_srvs
-    tf2
     wam_msgs
     wam_srvs
   )
-  target_link_libraries(wam_node ${BARRETT_LIBRARIES} ${Boost_LIBRARIES})
-  install(TARGETS wam_node DESTINATION lib/${PROJECT_NAME})
+  target_link_libraries(barrett_hand_node ${BARRETT_LIBRARIES} ${Boost_LIBRARIES})
+  install(TARGETS barrett_hand_node DESTINATION lib/${PROJECT_NAME})
 else()
-  message(WARNING "Barrett CMake package was not found. Skipping wam_node hardware executable; install libbarrett to build CAN-bus WAM control.")
+  message(WARNING "Barrett CMake package was not found. Skipping standalone BarrettHand executable; install libbarrett to build CAN-bus hand control.")
 endif()
 
 install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
