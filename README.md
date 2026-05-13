@@ -1,359 +1,477 @@
-# Barrett WAM ROS 2 Humble Port
+# Barrett WAM ROS 2 Humble Driver
 
-![](https://github.com/gaolongsen/picx-images-hosting/raw/master/barrett_arm_hand.pfx4ph3f4.webp)
+ROS 2 Humble driver for controlling a Barrett WAM arm over CAN bus through
+`libbarrett`.
 
-This branch is a ROS 2 Humble-oriented port of the Barrett WAM ROS driver. It keeps WAM and BarrettHand hardware access in libbarrett, which is the layer that talks to the CAN bus, and ports the ROS transport/build/launch surface to `ament_cmake`, `rclcpp`, and ROS 2 interfaces.
+This repository ports the original ROS 1 Barrett WAM interface to ROS 2 while
+keeping the low-level hardware access in `libbarrett`. It has been validated on
+a local control PC with a 7-DOF WAM, SocketCAN, ROS 2 Humble, and Ubuntu
+22.04-style system dependencies.
 
-> Important: ROS 2 Humble is officially targeted at Ubuntu 22.04. This PC is currently Ubuntu 20.04 with Humble installed, so source-level builds can work, but hardware/runtime support depends on the local Humble and libbarrett installation.
+![Barrett WAM](https://github.com/gaolongsen/picx-images-hosting/raw/master/barrett_arm_hand.pfx4ph3f4.webp)
 
-> ROS package for the Barrett WAM and related products.
+## Highlights
 
-- [Overview](#overview)
-- [ Pre-Requisites](#pre-requisites)
-- [Compiling the package](#compiling-the-package)
-- [Running `wam_node`](#running-wam_node)
-- [Running `wam_demos`](#running-wam_demos)
-- [Running `perception_palm`](#running-perception_palm)
-	- [Set up cameras](#set-up-cameras)
-	- [Calibration](#calibration)
-	- [Running the demo](#running-the-demo)
-	- [Accessing the sensors](#accessing-the-sensors)
-	 - [LED](#led)
-	 - [Laser](#laser)
-	 - [IR Range finder](#ir-range-finder)
-	 - [Camera](#camera)
-    - [Networking](#networking)
-	- [Troubleshooting](#troubleshooting)
-- [Running `barrett_hand_node`](#running-barrett_hand_node)
-- [Example of running the services (Tested on ROS Melodic and Indigo)](#example-of-running-the-services-tested-on-ros-melodic-and-indigo)
+- ROS 2 Humble `ament_cmake` build.
+- CAN-bus WAM control through patched `libbarrett`.
+- ROS 2 interfaces for WAM state, realtime commands, and service commands.
+- Optional BarrettHand and force/torque sensor support when discovered by
+  `libbarrett`.
+- Conservative launch defaults for first-time hardware bring-up.
+- Helper tools for `rqt` and safe single-joint motion diagnostics.
 
-## Overview
-This is Barrett Technology's ROS repository that wraps Libbarrett's functionalities and includes a ROS driver for Barrett's Perception Palm. The Perception Palm includes a LED, a Laser, two cameras and an IR Range finder. The driver for the Perception palm wraps the open source C/C++ library for Microchip's USB-to-SPI protocol coverter. Libbarrett is a real-time controls library written in C++ that runs Barrett Technology's products, including the WAM Arm and the BH8-282 BarrettHand. 
+## Repository Layout
 
-- The `wam_node` stack is designed to be run on a WAM PC-104 or external control PC, and can work with the WAM with any combination of the wrist, BarrettHand and the Force/Torque sensor attached.
-- The `barrett_hand_node` stack is designed to run on an external control PC and can work with the BarrettHand standalone **connected via the CAN bus**.
-- The `perception_palm` stack is designed to run on an external control PC.
-- The `wam_msgs`, `wam_srvs` and `wam_teleop` stacks are designed as the interface to communicate with the functionality exposed by the` wam_node`.
+```text
+wam_node/              ROS 2 WAM hardware node
+barrett_hand_node/     ROS 2 standalone BarrettHand node
+wam_msgs/              ROS 2 custom messages
+wam_srvs/              ROS 2 custom services
+wam_teleop/            ROS 2 joystick teleoperation
+scripts/               Small user-facing test utilities
+libbarrett/            Patched libbarrett source, if vendored in this repo
+wam_demos/             Legacy ROS 1 package, ignored by colcon
+perception_palm/       Legacy ROS 1 package, ignored by colcon
+```
 
-## ROS 2 Humble Status
+## Tested Platform
 
-Ported for ROS 2:
-- `wam_msgs`: custom ROS 2 messages.
-- `wam_srvs`: custom ROS 2 services.
-- `wam_node`: WAM hardware node, built when libbarrett is installed.
-- `barrett_hand_node`: standalone BarrettHand node, built when libbarrett is installed.
-- `wam_teleop`: joystick teleoperation node.
+Recommended target:
 
-Left as ROS 1 legacy and ignored by colcon for now:
-- `wam_demos`
-- `perception_palm`
+- Ubuntu 22.04
+- ROS 2 Humble
+- SocketCAN or PEAK PCAN CAN interface exposed as `can0`
+- Barrett WAM with safety pendant
+- Patched `libbarrett` built from this repository or from your patched
+  `libbarrett` fork
 
-The hardware nodes use libbarrett `ProductManager`, `systems::Wam`, `Hand`, and optional force/torque sensor APIs. CAN-bus setup therefore remains a libbarrett/system configuration requirement, not a ROS middleware feature.
+Notes:
 
-## Pre-Requisites
-#### Target system: Ubuntu 22.04 + ROS 2 Humble
-1. Install ROS 2 Humble desktop or base packages.
+- ROS 2 Humble officially targets Ubuntu 22.04.
+- The WAM is real hardware. Keep the E-stop reachable, clear the workspace, and
+  do not run motion commands until the arm is physically safe.
+- The original ROS 1 demo and Perception Palm packages are not ported in this
+  tree and are intentionally ignored by `colcon`.
 
-2. Install and configure libbarrett for the WAM/CAN hardware. The CMake package must be discoverable as `Barrett`. If it is not installed, `wam_node` and `barrett_hand_node` are skipped at build time and the interface/teleop packages still build.
+## Install Dependencies
 
-3. Install common build/runtime tools:
-```sh
+Install ROS 2 Humble first by following the official ROS 2 installation guide
+for Ubuntu 22.04. Then install the build and runtime packages used by this
+driver:
+
+```bash
 sudo apt update
-sudo apt install python3-colcon-common-extensions ros-humble-joy
+sudo apt install -y \
+  build-essential \
+  cmake \
+  git \
+  can-utils \
+  libboost-system-dev \
+  libboost-thread-dev \
+  libconfig++-dev \
+  libeigen3-dev \
+  libgsl-dev \
+  libncurses5-dev \
+  python3-colcon-common-extensions \
+  ros-humble-joy \
+  ros-humble-rqt \
+  ros-humble-rqt-common-plugins \
+  ros-humble-rqt-service-caller
 ```
 
-4. If Anaconda is active, put system ROS Python first while building:
-```
-export PATH=/opt/ros/humble/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH
+If Conda is active, use the system ROS tools when building and running:
+
+```bash
+conda deactivate || true
+source /opt/ros/humble/setup.bash
 ```
 
-## Compiling the package
+## Build and Install Patched libbarrett
+
+This ROS 2 port requires a patched `libbarrett` for modern Ubuntu/libconfig/C++
+toolchains. The patch set includes:
+
+- Compatibility with stock Ubuntu `libconfig++`.
+- C++17-compatible public headers.
+- SocketCAN build support for non-realtime Linux control.
+- A more robust CAN receive buffer during recovery/reconnect.
+- `COLCON_IGNORE` so `colcon` does not try to build `libbarrett` as a ROS
+  package.
+
+If this repository contains the patched `libbarrett/` folder, build it with:
+
+```bash
+cd ~/Dropbox/Barrett-7-DoF-Robot-Arm-ROS1/libbarrett
+mkdir -p build
+cd build
+cmake .. \
+  -DNON_REALTIME=true \
+  -DWITH_PYTHON=OFF \
+  -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+sudo make install
+sudo ldconfig
+```
+
+Verify installation:
+
+```bash
+ldconfig -p | grep libbarrett
+test -f /usr/local/share/barrett/barrett-config.cmake && echo "Barrett CMake config OK"
+test -f /usr/local/include/barrett/detail/libconfig_c_setting.h && echo "Patched headers OK"
+```
+
+## Configure CAN
+
+Bring up the CAN interface before starting the WAM node:
+
+```bash
+sudo modprobe can
+sudo modprobe can_raw
+sudo modprobe can_dev
+
+sudo ip link set can0 down || true
+sudo ip link set can0 up type can bitrate 1000000 restart-ms 100
+ip -details -statistics link show can0
+```
+
+Optional passive bus check:
+
+```bash
+candump -L can0
+```
+
+Do not leave `candump` or any other CAN reader/writer running while starting
+`wam_node`.
+
+## Build the ROS 2 Workspace
+
 From the repository root:
 
-```sh
+```bash
+cd ~/Dropbox/Barrett-7-DoF-Robot-Arm-ROS1
 source /opt/ros/humble/setup.bash
 ./build.sh
 source install_ros2/setup.bash
 ```
 
-If this repository is inside a larger colcon workspace, build from the workspace root instead:
-```sh
-colcon build --symlink-install
+Expected ROS 2 packages:
+
+```bash
+ros2 pkg list | grep -E 'wam_|barrett_hand_node'
+ros2 pkg executables wam_node
+ros2 pkg executables wam_teleop
 ```
 
-## Running `wam_node`
-Launch the WAM node with the WAM connected and libbarrett/CAN configured:
-```sh
+## First WAM Bring-Up
+
+For first contact, run the executable directly so libbarrett can read terminal
+input during the zeroing prompt:
+
+```bash
+cd ~/Dropbox/Barrett-7-DoF-Robot-Arm-ROS1
+source /opt/ros/humble/setup.bash
+source install_ros2/setup.bash
+./install_ros2/wam_node/lib/wam_node/wam_node
+```
+
+Follow the safety pendant sequence:
+
+1. Clear the workspace and keep E-stop reachable.
+2. Release E-stop.
+3. When prompted, press `SHIFT + IDLE`.
+4. If prompted to zero, move the WAM to its physical home/zero pose and press
+   `Enter`.
+5. When prompted, press `SHIFT + ACTIVATE`.
+
+After startup, verify ROS discovery:
+
+```bash
+ros2 node list
+ros2 topic list -t
+ros2 service list -t
+ros2 topic echo --once /wam/joint_states
+```
+
+## Launching wam_node
+
+After the first bring-up is working, launch through ROS 2:
+
+```bash
 ros2 launch wam_node wam_node.launch.py
 ```
 
-By default the ROS 2 node matches the original ROS 1 driver and enables WAM
-gravity compensation after activation. This is important for joint-space moves:
-without gravity compensation, gravity-loaded joints may not track commanded
-joint positions. For first-contact diagnostics only, it can be disabled with:
-```sh
-ros2 launch wam_node wam_node.launch.py auto_gravity_comp:=false
+Launch arguments:
+
+```bash
+ros2 launch wam_node wam_node.launch.py --show-args
 ```
 
-Useful smoke checks after building:
-```sh
-ros2 interface show wam_msgs/msg/RTCartVel
-ros2 interface show wam_srvs/srv/JointMove
-ros2 topic echo /wam/joint_states
-```
+Important defaults:
 
-The `/wam/go_home` service moves to libbarrett's configured WAM home pose, not
-to all-zero joint angles. For a 7-DOF wrist WAM this is typically
-`[0, -2, 0, 3.13, 0, 0, 0]`. The ROS 2 launch file exposes conservative home
-motion parameters:
-```sh
+- `auto_gravity_comp:=true`
+  - Matches the original ROS 1 behavior.
+  - Required for stable joint-position control on gravity-loaded joints.
+- `initialize_hand_on_startup:=false`
+  - Avoids automatic BarrettHand initialization during first WAM startup.
+- `hand_clearance_move_on_startup:=false`
+  - Avoids the original automatic joint-4 clearance move.
+- `home_velocity:=0.10`
+- `home_acceleration:=0.10`
+
+For a slower home motion:
+
+```bash
 ros2 launch wam_node wam_node.launch.py home_velocity:=0.05 home_acceleration:=0.05
 ```
 
-## Running `wam_demos`
+## ROS 2 Topics
 
-**To Cycle a 7DOF WAM and BarrettHand 10 times from a shell script:**
-```
-sh cmds-7dof-cycle.sh 10
-```
+State topics:
 
-**To Teach:**
-```
-rosrun wam_demos teach -t <record_type> -n <bag_name>
-```
-The -t <record_type> field allows you to choose how to record the trajectories
-Possible values are:
-- ```-t jp```: Record using joint positions
-- ```-t jv```: Record using joint positions
-
-**To Play:**
-```
-rosrun wam_demos play <bag_name>
+```text
+/wam/joint_states       sensor_msgs/msg/JointState
+/wam/pose               geometry_msgs/msg/PoseStamped
+/wam/move_is_done       std_msgs/msg/Bool
+/fts/fts_states         geometry_msgs/msg/Wrench, if F/T sensor is present
 ```
 
-## Running `perception_palm`
+Command topics:
 
-### Set up cameras:
-1. Install the camera utilities
-```
-sudo apt install v4l-utils guvcview
-```
-2. Connect the Perception Palm to the PC using a USB cable
-
-3. Determine the device names for the Perception Palm cameras. 
-
-List the video devices with:
-```
-v4l2-ctl --list-devices
-```
-To determine which devices are correct, you can use a program such as `guvcview`:
-```
-guvcview -d /dev/video0
-```
-Note which device corresponds to which camera. Some of the /dev/video devices may actually correspond to a camera's metadata (like image format) instead of representing a video stream. For detailed information on /dev/video0 (for example), use:
-```
-v4l2-ctl --device=/dev/video0 --all
-```
-If the "Device Caps" section advertises "Video Capture", then this device has a valid video stream.
-
-4. Edit the launch file to confirm camera setup parameters.
-```
-gedit ~/catkin_ws/src/barrett-ros-pkg/perception_palm/launch/perception_palm.launch
-```
-Ensure that the launch file targets the correct devices. If you need to change the default devices, edit the lines in the launch file that look like this:
-```
-<param name="device" type="string" value="/dev/video0" />
+```text
+/wam/cart_vel_cmd       wam_msgs/msg/RTCartVel
+/wam/ortn_vel_cmd       wam_msgs/msg/RTOrtnVel
+/wam/jnt_vel_cmd        wam_msgs/msg/RTJointVel
+/wam/jnt_pos_cmd        wam_msgs/msg/RTJointPos
+/wam/cart_pos_cmd       wam_msgs/msg/RTCartPos
 ```
 
-*Notes*
+Realtime command topics are timeout-based. If messages stop, the node returns
+to holding the current joint position.
 
-A single camera can be used at a maximum resolution of 1600 x 1200. Two cameras are limited to a maximum resolution of 320 x 240 due to how much USB bandwidth is (incorrectly) requested/estimated for each video stream. For information on alternative camera resolutions, formats, and frame rates, use this command:
-```
-v4l2-ctl --list-formats-ext
-```
+## ROS 2 Services
 
-The camera with the red filter is physically rotated 180 degrees with respect to the other camera. You may want to flip the video stream from this camera.
+Core WAM services:
 
-### Calibration
-
-**IR Range finder**
-
-**The IR range finder needs to be calibrated for the first time before using it.** It will work without calibration but it might not be accurate. Follow the instructions below to calibrate it. This step can be skipped if you do not want to use the IR or if the IR range finder is already calibrated.
-```
-cd ~/catkin_ws/src/barrett-ros-pkg/perception_palm/include/MCP2210-Library
-make
-sudo ./dist/Debug/GNU-Linux-x86/ir_calibrate
-```
-Follow the onscreen instructions.
-
-**Cameras**
-
-Please refer to the ROS [Stereo](http://wiki.ros.org/camera_calibration/Tutorials/StereoCalibration)/[Monocular](http://wiki.ros.org/camera_calibration/Tutorials/MonocularCalibration) calibration package. This step is completely optional. The cameras would work even if this step is skipped.
-
-### Running the demo
-
-1.  (every time you plug in the Perception Palm or reboot the computer). For one camera
-```
-sudo rmmod uvcvideo
-sudo modprobe uvcvideo
-```
-    or two cameras
-```
-sudo rmmod uvcvideo
-sudo modprobe uvcvideo quirks=128
+```text
+/wam/gravity_comp       wam_srvs/srv/GravityComp
+/wam/go_home            std_srvs/srv/Empty
+/wam/hold_joint_pos     wam_srvs/srv/Hold
+/wam/hold_cart_pos      wam_srvs/srv/Hold
+/wam/hold_ortn          wam_srvs/srv/Hold
+/wam/joint_move         wam_srvs/srv/JointMove
+/wam/pose_move          wam_srvs/srv/PoseMove
+/wam/cart_move          wam_srvs/srv/CartPosMove
+/wam/ortn_move          wam_srvs/srv/OrtnMove
 ```
 
-2. Become the root user to access the drivers and run the demo.
-**For one camera:**
-```
-sudo -s
-source /home/robot/catkin_ws/devel/setup.bash
-roslaunch perception_palm perception_palm.launch
+Enable gravity compensation:
+
+```bash
+ros2 service call /wam/gravity_comp wam_srvs/srv/GravityComp "{gravity: true}"
 ```
 
-**For two cameras:**
-```
-sudo -s
-source ~/catkin_ws/devel/setup.bash
-roslaunch perception_palm perception_palm.launch mono_camera:=false
+Move to an absolute 7-DOF joint pose:
+
+```bash
+ros2 service call /wam/joint_move wam_srvs/srv/JointMove \
+  "{joints: [0.0, -1.5, 0.0, 2.0, 0.0, 0.0, 0.0]}"
 ```
 
-3. To quit, press Ctrl-C. Then type `exit` to return to a regular terminal.
+Move to the configured libbarrett home pose:
 
-*Troubleshooting*
-
-If the camera node fails to start in step 2, make sure the configuration you chose in step 1 matches the configuration in the launch file. See the "Set up cameras" section for details.
-
-### Accessing the sensors
-
-While the demo is running you can access the sensors from a separate terminal.
-
-#### LED
-
-The LED can be turned off and on by calling the service barrett/palm/set_led_on.<br />
-```	
-rosservice call barrett/palm/set_led_on ['True']
-rosservice call barrett/palm/set_led_on ['False']
+```bash
+ros2 service call /wam/go_home std_srvs/srv/Empty "{}"
 ```
 
-#### Laser
+Important: `/wam/go_home` is not all-zero joints. For a typical 7-DOF wrist WAM
+the configured home pose is:
 
-The Laser can be turned off and on by calling the service barrett/palm/set_laser_on.<br />
-```	
-rosservice call barrett/palm/set_laser_on ['True']
-rosservice call barrett/palm/set_laser_on ['False']
-```
-
-#### IR Range finder
-
-The IR range finder publishes the range information as a sensor_msgs/Range message, at 1Hz to the topic barrett/palm/ir/range<br />
-```
-rostopic echo barrett/palm/ir/range
+```text
+[0, -2, 0, 3.13, 0, 0, 0]
 ```
 
-#### Camera
+This value comes from `/etc/barrett/calibration_data/wam7w/zerocal.conf` or the
+corresponding WAM configuration selected by `libbarrett`.
 
-By default, the two camera feeds are published at the rate of 30 fps with a resolution of 320x240 px. They are published to the topics, barrett/palm/left/image_raw and barrett/palm/right/image_Raw.<br />
-While using the monocular camera mode, the images are published at the rate of 30 fps with a resolution of 1600 x 1200 to the topic barrett/palm/image_raw.<br />
+## Safe Joint Motion Test
 
-### Networking
+Use the helper script to test one joint at a time. It reads the current joint
+state, adds a small delta to one joint, calls `/wam/joint_move`, waits for
+`/wam/move_is_done`, and prints final error.
 
-This is required if you use run the ROS nodes across multiple computers. The below instructions are to setup the perception palm on the XWAM and to control it from a remote host.
+```bash
+cd ~/Dropbox/Barrett-7-DoF-Robot-Arm-ROS1
+source /opt/ros/humble/setup.bash
+source install_ros2/setup.bash
 
-In the host computer, open a new terminal and ssh into the XWAM
-```
-ssh summit@*xwam's ip address*
-```
-Enter the XWAM's password and open the hosts file
-```
-sudo vi /etc/hosts
-```
-Add the IP address of the remote host machine to the list and name it
-```
-*remote host's ip address* *remote host's name*
-```
-Save and exit it. Set the XWAM to be the ROS MASTER
-```
-export ROS_MASTER_URI=http://*XWAM's ip address*:11311
-```
-Open a new terminal and edit the host file in the host machine as above
-```
-sudo vi /etc/hosts
-```
-In the host machine, name the IP address of the xwam
-```
-*xwam's ip address* summit
-```
-Save and exit it. Update the ROS_MASTER as the XWAM in the host machine
-```
-export ROS_MASTER_URI=http://*XWAM's ip address*:11311
+scripts/wam_joint_nudge.py 1 0.02
+scripts/wam_joint_nudge.py 1 -0.02
 ```
 
-P.S: The ROS_MASTER_URI variable would be active as long as the terminal is open. If the terminal is closed and restarted, the ROS_MASTER_URI needs to be updated.
-For more information on ROS network configuration refer to [ROS documentation](http://wiki.ros.org/ROS/NetworkSetup).
+Test joints 1 through 7 slowly. Do not send the next command until the previous
+one finishes.
 
-### Troubleshooting
+If Fast DDS prints shared-memory warnings such as `Failed init_port`, disable
+Fast DDS shared memory for the current terminal:
 
-Trying to restart the perception_palm package multiple times might fail with an error "Error setting SPI Parameters".
-This can be solved by unplugging and plugging back the USB to the port.
-
-## Running `barrett_hand_node`
-
-Launch the ```barrett_hand_node.launch``` file, with the **BarrettHand connected via the CAN bus**:
-```sh
-roslaunch barrett_hand_node barrett_hand_node.launch
+```bash
+export RMW_FASTRTPS_USE_SHM=0
 ```
 
-In a separate terminal:
-```sh
-rosservice call /bhand/close_grasp
-rosservice call /bhand/open_grasp
-rosservice call /bhand/grasp_pos 1.57
-rosservice call /bhand/finger_pos "[0.5, 1, 1.5]"
-rosservice call /bhand/initialize
-rosservice call /bhand/spread_pos 1.57
-rosservice call /bhand/open_spread
+## rqt
 
-rostopic echo /bhand/finger_tip_states
-rostopic echo /bhand/joint_states
-rostopic echo /bhand/tactile_states
+Launch `rqt` from the repository helper so it uses the same ROS 2 workspace
+environment and avoids Conda/Snap/Qt library pollution:
+
+```bash
+cd ~/Dropbox/Barrett-7-DoF-Robot-Arm-ROS1
+./run_rqt_wam.sh --clear-config --force-discover
 ```
 
-## Examples of running the WAM services (Tested on ROS Melodic and Indigo)
-**Move WAM Joints:**
-```
-rosservice call /wam/joint_move "joints:
-- 0.0
-- 0.0
-- 0.0
-- 0.0"
+Open:
+
+```text
+Plugins -> Services -> Service Caller
 ```
 
-**Move WAM to Tool Pose:**
-```
-rosservice call /wam/pose_move "pose:
-  position:
-    x: 0.048
-    y: 0.0
-    z: 0.618
-  orientation:
-    x: -0.0190
-    y: 0.9022
-    z: -0.2516
-    w: -0.3498"
+For `/wam/joint_move`, edit the `joints` expression from the default empty
+array to a 7-value Python list:
+
+```python
+[0.0, -1.5, 0.0, 2.0, 0.0, 0.0, 0.0]
 ```
 
-**Move WAM Home:**
-```
-rosservice call /wam/go_home
+Do not publish to `/wam/joint_states`; it is a feedback topic, not a command
+topic.
+
+## BarrettHand Node
+
+For standalone BarrettHand control over CAN:
+
+```bash
+ros2 launch barrett_hand_node barrett_hand_node.launch.py
 ```
 
-**Hold Joint Positions:**
-```
-rosservice call /wam/hold_joint_pos "hold: true"
+Example services:
+
+```bash
+ros2 service call /bhand/initialize std_srvs/srv/Empty "{}"
+ros2 service call /bhand/open_grasp std_srvs/srv/Empty "{}"
+ros2 service call /bhand/close_grasp std_srvs/srv/Empty "{}"
+ros2 service call /bhand/grasp_pos wam_srvs/srv/BHandGraspPos "{radians: 1.0}"
 ```
 
-**Unhold Joint Positions:**
+## Joystick Teleoperation
+
+Start the WAM node first, then launch teleoperation:
+
+```bash
+ros2 launch wam_teleop wam_joystick_teleop.launch.py
 ```
-rosservice call /wam/hold_joint_pos "hold: false"
+
+The teleop node subscribes to `/joy` and publishes WAM realtime velocity
+commands.
+
+## Recovery After E-stop or Shaking
+
+If the WAM shakes, behaves unexpectedly, or E-stop is pressed:
+
+1. Press E-stop.
+2. Stop `wam_node`.
+3. Reset the CAN interface:
+
+   ```bash
+   sudo ip link set can0 down
+   sudo ip link set can0 up type can bitrate 1000000 restart-ms 100
+   ```
+
+4. Restart `wam_node`.
+5. Press `SHIFT + IDLE`.
+6. Zero if prompted.
+7. Press `SHIFT + ACTIVATE`.
+8. Re-enable gravity compensation if needed:
+
+   ```bash
+   ros2 service call /wam/gravity_comp wam_srvs/srv/GravityComp "{gravity: true}"
+   ```
+
+Do not continue sending commands after serious shaking without restarting the
+node and recovering the safety state.
+
+## Troubleshooting
+
+### `librcl_interfaces__rosidl_typesupport_cpp.so` not found
+
+You likely overwrote `LD_LIBRARY_PATH`. Source ROS 2 and prepend any local
+library path instead of replacing it:
+
+```bash
+source /opt/ros/humble/setup.bash
+source install_ros2/setup.bash
+LD_LIBRARY_PATH=$PWD/libbarrett/build/src:$LD_LIBRARY_PATH ./install_ros2/wam_node/lib/wam_node/wam_node
 ```
+
+### `rqt` loads Snap or Conda libraries
+
+Use:
+
+```bash
+./run_rqt_wam.sh --clear-config --force-discover
+```
+
+If needed, use a fresh non-Snap terminal and deactivate Conda.
+
+### `BusManager::storeMessage: Buffer overflow`
+
+Use the patched `libbarrett` in this repository. Rebuild and install it:
+
+```bash
+cd libbarrett/build
+make -j$(nproc)
+sudo make install
+sudo ldconfig
+```
+
+Then reset CAN before reconnecting:
+
+```bash
+sudo ip link set can0 down
+sudo ip link set can0 up type can bitrate 1000000 restart-ms 100
+```
+
+### Joint commands are accepted but gravity-loaded joints do not move
+
+Ensure gravity compensation is enabled:
+
+```bash
+ros2 service call /wam/gravity_comp wam_srvs/srv/GravityComp "{gravity: true}"
+```
+
+The default launch file enables it automatically with `auto_gravity_comp:=true`.
+
+### `rqt` sends `0-DOF request received`
+
+The Service Caller sent an empty array. For `/wam/joint_move`, the `joints`
+field must be a 7-element list.
+
+### WAM home target is unexpected
+
+`/wam/go_home` uses the home pose from libbarrett configuration, usually in:
+
+```text
+/etc/barrett/calibration_data/wam7w/zerocal.conf
+```
+
+Check that the installed Barrett calibration files match your physical WAM.
+
+## Citation
+
+If this repository is useful for your work, please cite or acknowledge the
+project repository and Barrett Technology's original ROS/libbarrett software.
+
+## License
+
+This repository is derived from Barrett ROS/libbarrett software. Keep the
+original license files and notices from upstream components when redistributing
+or modifying this code.
