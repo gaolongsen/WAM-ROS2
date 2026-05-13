@@ -1,5 +1,11 @@
 # Barrett WAM ROS 2 Humble Driver
 
+[![Ubuntu](https://img.shields.io/badge/Ubuntu-22.04-E95420.svg)](#-tested-platform)
+[![ROS 2](https://img.shields.io/badge/ROS%202-Humble-22314E.svg)](#-tested-platform)
+[![CAN](https://img.shields.io/badge/CAN-SocketCAN-2E8B57.svg)](#-configure-can)
+[![Robot](https://img.shields.io/badge/Robot-Barrett%20WAM-6A5ACD.svg)](#-first-wam-bring-up)
+[![Build](https://img.shields.io/badge/Build-colcon%20%2B%20ament-0A7EA4.svg)](#-build-the-ros-2-workspace)
+
 ROS 2 Humble driver for controlling a Barrett WAM arm over CAN bus through
 `libbarrett`.
 
@@ -10,17 +16,17 @@ a local control PC with a 7-DOF WAM, SocketCAN, ROS 2 Humble, and Ubuntu
 
 ![Barrett WAM](https://github.com/gaolongsen/picx-images-hosting/raw/master/barrett_arm_hand.pfx4ph3f4.webp)
 
-## Highlights
+## ✨ Highlights
 
-- ROS 2 Humble `ament_cmake` build.
-- CAN-bus WAM control through patched `libbarrett`.
-- ROS 2 interfaces for WAM state, realtime commands, and service commands.
-- Optional BarrettHand and force/torque sensor support when discovered by
+- 🤖 ROS 2 Humble `ament_cmake` build.
+- 📡 CAN-bus WAM control through patched `libbarrett`.
+- 🧩 ROS 2 interfaces for WAM state, realtime commands, and service commands.
+- 🖐️ Optional BarrettHand and force/torque sensor support when discovered by
   `libbarrett`.
-- Conservative launch defaults for first-time hardware bring-up.
-- Helper tools for `rqt` and safe single-joint motion diagnostics.
+- 🛡️ Conservative launch defaults for first-time hardware bring-up.
+- 🧪 Helper tools for `rqt` and safe single-joint motion diagnostics.
 
-## Repository Layout
+## 📁 Repository Layout
 
 ```text
 wam_node/              ROS 2 WAM hardware node
@@ -34,26 +40,26 @@ wam_demos/             Legacy ROS 1 package, ignored by colcon
 perception_palm/       Legacy ROS 1 package, ignored by colcon
 ```
 
-## Tested Platform
+## 🧭 Tested Platform
 
 Recommended target:
 
-- Ubuntu 22.04
-- ROS 2 Humble
-- SocketCAN or PEAK PCAN CAN interface exposed as `can0`
-- Barrett WAM with safety pendant
-- Patched `libbarrett` built from this repository or from your patched
+- 🐧 Ubuntu 22.04
+- 🛰️ ROS 2 Humble
+- 🔌 SocketCAN or PEAK PCAN CAN interface exposed as `can0`
+- 🦾 Barrett WAM with safety pendant
+- 📚 Patched `libbarrett` built from this repository or from your patched
   `libbarrett` fork
 
 Notes:
 
 - ROS 2 Humble officially targets Ubuntu 22.04.
-- The WAM is real hardware. Keep the E-stop reachable, clear the workspace, and
+- ⚠️ The WAM is real hardware. Keep the E-stop reachable, clear the workspace, and
   do not run motion commands until the arm is physically safe.
 - The original ROS 1 demo and Perception Palm packages are not ported in this
   tree and are intentionally ignored by `colcon`.
 
-## Install Dependencies
+## 📦 Install Dependencies
 
 Install ROS 2 Humble first by following the official ROS 2 installation guide
 for Ubuntu 22.04. Then install the build and runtime packages used by this
@@ -86,16 +92,16 @@ conda deactivate || true
 source /opt/ros/humble/setup.bash
 ```
 
-## Build and Install Patched libbarrett
+## 🛠️ Build and Install Patched libbarrett
 
 This ROS 2 port requires a patched `libbarrett` for modern Ubuntu/libconfig/C++
 toolchains. The patch set includes:
 
-- Compatibility with stock Ubuntu `libconfig++`.
-- C++17-compatible public headers.
-- SocketCAN build support for non-realtime Linux control.
-- A more robust CAN receive buffer during recovery/reconnect.
-- `COLCON_IGNORE` so `colcon` does not try to build `libbarrett` as a ROS
+- 🧭 Compatibility with stock Ubuntu `libconfig++`.
+- 🧱 C++17-compatible public headers.
+- 📡 SocketCAN build support for non-realtime Linux control.
+- 🛡️ A more robust CAN receive buffer during recovery/reconnect.
+- 📦 `COLCON_IGNORE` so `colcon` does not try to build `libbarrett` as a ROS
   package.
 
 If this repository contains the patched `libbarrett/` folder, build it with:
@@ -121,7 +127,7 @@ test -f /usr/local/share/barrett/barrett-config.cmake && echo "Barrett CMake con
 test -f /usr/local/include/barrett/detail/libconfig_c_setting.h && echo "Patched headers OK"
 ```
 
-## Configure CAN
+## 🔌 Configure CAN
 
 Bring up the CAN interface before starting the WAM node:
 
@@ -144,7 +150,7 @@ candump -L can0
 Do not leave `candump` or any other CAN reader/writer running while starting
 `wam_node`.
 
-## Build the ROS 2 Workspace
+## 🧱 Build the ROS 2 Workspace
 
 From the repository root:
 
@@ -163,7 +169,7 @@ ros2 pkg executables wam_node
 ros2 pkg executables wam_teleop
 ```
 
-## First WAM Bring-Up
+## 🦾 First WAM Bring-Up
 
 For first contact, run the executable directly so libbarrett can read terminal
 input during the zeroing prompt:
@@ -193,7 +199,7 @@ ros2 service list -t
 ros2 topic echo --once /wam/joint_states
 ```
 
-## Launching wam_node
+## 🚀 Launching wam_node
 
 After the first bring-up is working, launch through ROS 2:
 
@@ -225,7 +231,7 @@ For a slower home motion:
 ros2 launch wam_node wam_node.launch.py home_velocity:=0.05 home_acceleration:=0.05
 ```
 
-## ROS 2 Topics
+## 📡 ROS 2 Topics
 
 State topics:
 
@@ -249,7 +255,7 @@ Command topics:
 Realtime command topics are timeout-based. If messages stop, the node returns
 to holding the current joint position.
 
-## ROS 2 Services
+## 🧰 ROS 2 Services
 
 Core WAM services:
 
@@ -294,7 +300,7 @@ the configured home pose is:
 This value comes from `/etc/barrett/calibration_data/wam7w/zerocal.conf` or the
 corresponding WAM configuration selected by `libbarrett`.
 
-## Safe Joint Motion Test
+## 🧪 Safe Joint Motion Test
 
 Use the helper script to test one joint at a time. It reads the current joint
 state, adds a small delta to one joint, calls `/wam/joint_move`, waits for
@@ -319,7 +325,7 @@ Fast DDS shared memory for the current terminal:
 export RMW_FASTRTPS_USE_SHM=0
 ```
 
-## rqt
+## 🖥️ rqt
 
 Launch `rqt` from the repository helper so it uses the same ROS 2 workspace
 environment and avoids Conda/Snap/Qt library pollution:
@@ -345,7 +351,7 @@ array to a 7-value Python list:
 Do not publish to `/wam/joint_states`; it is a feedback topic, not a command
 topic.
 
-## BarrettHand Node
+## 🖐️ BarrettHand Node
 
 For standalone BarrettHand control over CAN:
 
@@ -362,7 +368,7 @@ ros2 service call /bhand/close_grasp std_srvs/srv/Empty "{}"
 ros2 service call /bhand/grasp_pos wam_srvs/srv/BHandGraspPos "{radians: 1.0}"
 ```
 
-## Joystick Teleoperation
+## 🎮 Joystick Teleoperation
 
 Start the WAM node first, then launch teleoperation:
 
@@ -373,7 +379,7 @@ ros2 launch wam_teleop wam_joystick_teleop.launch.py
 The teleop node subscribes to `/joy` and publishes WAM realtime velocity
 commands.
 
-## Recovery After E-stop or Shaking
+## 🛟 Recovery After E-stop or Shaking
 
 If the WAM shakes, behaves unexpectedly, or E-stop is pressed:
 
@@ -399,7 +405,7 @@ If the WAM shakes, behaves unexpectedly, or E-stop is pressed:
 Do not continue sending commands after serious shaking without restarting the
 node and recovering the safety state.
 
-## Troubleshooting
+## 🔎 Troubleshooting
 
 ### `librcl_interfaces__rosidl_typesupport_cpp.so` not found
 
@@ -465,12 +471,12 @@ field must be a 7-element list.
 
 Check that the installed Barrett calibration files match your physical WAM.
 
-## Citation
+## 📖 Citation
 
 If this repository is useful for your work, please cite or acknowledge the
 project repository and Barrett Technology's original ROS/libbarrett software.
 
-## License
+## 📜 License
 
 This repository is derived from Barrett ROS/libbarrett software. Keep the
 original license files and notices from upstream components when redistributing
