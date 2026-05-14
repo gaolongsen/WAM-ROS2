@@ -165,7 +165,7 @@ Do not leave `candump` or any other CAN reader/writer running while starting
 From the repository root:
 
 ```bash
-cd ~/Dropbox/Barrett-7-DoF-Robot-Arm-ROS1
+cd ~/WAM-ROS2
 source /opt/ros/humble/setup.bash
 ./build.sh
 source install_ros2/setup.bash
@@ -185,7 +185,7 @@ For first contact, run the executable directly so libbarrett can read terminal
 input during the zeroing prompt:
 
 ```bash
-cd ~/Dropbox/Barrett-7-DoF-Robot-Arm-ROS1
+cd ~/WAM-ROS2
 source /opt/ros/humble/setup.bash
 source install_ros2/setup.bash
 ./install_ros2/wam_node/lib/wam_node/wam_node
@@ -317,7 +317,7 @@ state, adds a small delta to one joint, calls `/wam/joint_move`, waits for
 `/wam/move_is_done`, and prints final error.
 
 ```bash
-cd ~/Dropbox/Barrett-7-DoF-Robot-Arm-ROS1
+cd ~/WAM-ROS2
 source /opt/ros/humble/setup.bash
 source install_ros2/setup.bash
 
@@ -341,7 +341,7 @@ Launch `rqt` from the repository helper so it uses the same ROS 2 workspace
 environment and avoids Conda/Snap/Qt library pollution:
 
 ```bash
-cd ~/Dropbox/Barrett-7-DoF-Robot-Arm-ROS1
+cd ~/WAM-ROS2
 ./run_rqt_wam.sh --clear-config --force-discover
 ```
 
