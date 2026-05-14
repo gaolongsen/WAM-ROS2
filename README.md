@@ -104,10 +104,12 @@ toolchains. The patch set includes:
 - 📦 `COLCON_IGNORE` so `colcon` does not try to build `libbarrett` as a ROS
   package.
 
-If this repository contains the patched `libbarrett/` folder, build it with:
+You should clone `libbarrett-ROS2`repo to your local PC and then build it as following instructions:
 
 ```bash
-cd ~/Dropbox/Barrett-7-DoF-Robot-Arm-ROS1/libbarrett
+cd
+git clone https://github.com/gaolongsen/libbarrett-ROS2.git
+cd libbarrett-ROS2
 mkdir -p build
 cd build
 cmake .. \
