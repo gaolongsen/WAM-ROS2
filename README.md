@@ -131,11 +131,7 @@ test -f /usr/local/include/barrett/detail/libconfig_c_setting.h && echo "Patched
 
 ## 🔌 Configure CAN
 
-Before you start this section, make sure that you have the CAN bus device. We recommend use 
-
-[PCAN]: https://www.peak-system.com/products/hardware/external-pc-interfaces/pcan-usb/
-
- as shown below to ensure you can successfully install the driver 100% to save your time for driver. 
+Before you start this section, make sure that you have the CAN bus device. We recommend use [PCAN USB Adapter](https://www.peak-system.com/products/hardware/external-pc-interfaces/pcan-usb/) as shown below to ensure you can successfully install the driver 100% to save your time for driver. 
 
 <img src="https://github.com/gaolongsen/picx-images-hosting/raw/master/peakcan.5xb9cxjzmy.webp" style="zoom:50%;" />
 
